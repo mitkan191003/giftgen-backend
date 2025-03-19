@@ -1,0 +1,31 @@
+[project]
+name = "giftgen-backend"
+version = "0.1.0"
+description = "Gift generation backend API and worker"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "alembic>=1.14.1,<2.0.0",
+  "boto3>=1.37.0,<2.0.0",
+  "fastapi>=0.115.12,<1.0.0",
+  "httpx>=0.28.1,<1.0.0",
+  "pydantic-settings>=2.8.1,<3.0.0",
+  "sqlalchemy>=2.0.39,<3.0.0",
+  "uvicorn[standard]>=0.34.0,<1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.5,<9.0.0",
+  "ruff>=0.11.0,<1.0.0",
+]
+
+[project.scripts]
+giftgen-worker = "app.workers.generation:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
