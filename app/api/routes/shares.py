@@ -7,12 +7,21 @@ from sqlalchemy.orm import Session, selectinload
 from app.api.deps import get_current_user
 from app.core.config import get_settings
 from app.db.session import get_db
-from app.models import Creation, Share, User, Visibility
+from app.models import Creation, CreationStatus, Share, ShareType, User, Visibility
 from app.schemas import AssetRead, PublicShareRead, ShareCreate, ShareRead
 from app.services.shares import generate_share_slug
 
 router = APIRouter()
 settings = get_settings()
+
+
+def _derive_creation_visibility(creation: Creation) -> str:
+    active_share_types = {share.share_type for share in creation.shares if share.is_active}
+    if ShareType.public.value in active_share_types:
+        return Visibility.public.value
+    if ShareType.unlisted.value in active_share_types:
+        return Visibility.unlisted.value
+    return Visibility.private.value
 
 
 @router.post("/shares", response_model=ShareRead)
@@ -23,22 +32,25 @@ def create_share(
 ) -> ShareRead:
     creation = db.scalar(
         select(Creation)
-        .options(selectinload(Creation.assets))
+        .options(selectinload(Creation.assets), selectinload(Creation.shares))
         .where(Creation.id == payload.creation_id, Creation.user_id == current_user.id)
     )
     if creation is None:
         raise HTTPException(status_code=404, detail="Creation not found")
+    if creation.status != CreationStatus.ready.value:
+        raise HTTPException(status_code=409, detail="Only ready creations can be shared")
+    if not creation.assets:
+        raise HTTPException(status_code=409, detail="Creation has no assets to share")
 
     slug = generate_share_slug(creation.title)
     while db.scalar(select(Share).where(Share.share_slug == slug)) is not None:
         slug = generate_share_slug(creation.title)
 
     share = Share(creation_id=creation.id, share_type=payload.share_type.value, share_slug=slug)
-    creation.visibility = (
-        Visibility.public.value if payload.share_type.value == "public" else Visibility.unlisted.value
-    )
 
     db.add(share)
+    creation.shares.append(share)
+    creation.visibility = _derive_creation_visibility(creation)
     db.commit()
     db.refresh(share)
 
@@ -58,6 +70,7 @@ def revoke_share(
 ) -> ShareRead:
     share = db.scalar(
         select(Share)
+        .options(selectinload(Share.creation).selectinload(Creation.shares))
         .join(Share.creation)
         .where(Share.id == share_id, Creation.user_id == current_user.id)
     )
@@ -66,6 +79,7 @@ def revoke_share(
 
     share.is_active = False
     share.revoked_at = datetime.now(timezone.utc)
+    share.creation.visibility = _derive_creation_visibility(share.creation)
     db.commit()
     db.refresh(share)
 

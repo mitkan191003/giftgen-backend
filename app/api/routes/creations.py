@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.api.deps import get_current_user
 from app.core.config import get_settings
 from app.db.session import get_db
-from app.models import Creation, CreationStatus, GenerationJob, GenerationStatus, User
+from app.models import ChatThread, Creation, CreationStatus, GenerationJob, GenerationStatus, User
 from app.schemas import AssetRead, CreationCreate, CreationEnvelope, CreationRead, GenerationJobRead
 from app.services.guardrails import PromptGuardrailService
 
@@ -27,6 +27,18 @@ def create_creation(
             status_code=400,
             detail={"message": "Prompt rejected by guardrails", "reasons": guardrail.reasons},
         )
+
+    source_thread = None
+    if payload.source_thread_id:
+        source_thread = db.scalar(
+            select(ChatThread).where(
+                ChatThread.id == payload.source_thread_id,
+                ChatThread.user_id == current_user.id,
+            )
+        )
+        if source_thread is None:
+            raise HTTPException(status_code=404, detail="Thread not found")
+        source_thread.updated_at = datetime.now(timezone.utc)
 
     creation = Creation(
         user_id=current_user.id,

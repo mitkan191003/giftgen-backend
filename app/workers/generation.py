@@ -47,6 +47,7 @@ def process_next_job() -> bool:
                     file_size=stored.size,
                 )
             )
+            job.provider_job_id = artifact.provider_job_id
             job.status = GenerationStatus.succeeded.value
             job.completed_at = datetime.now(timezone.utc)
             creation.status = CreationStatus.ready.value

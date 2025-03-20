@@ -1,0 +1,47 @@
+{{- if .Values.cleanup.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "giftgen.fullname" . }}-cleanup
+  labels:
+    {{- include "giftgen.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cleanup
+spec:
+  schedule: {{ .Values.cleanup.schedule | quote }}
+  concurrencyPolicy: {{ .Values.cleanup.concurrencyPolicy }}
+  successfulJobsHistoryLimit: {{ .Values.cleanup.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.cleanup.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "giftgen.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: cleanup
+        spec:
+          restartPolicy: Never
+          serviceAccountName: {{ include "giftgen.serviceAccountName" . }}
+          containers:
+            - name: cleanup
+              image: {{ include "giftgen.cleanupImage" . }}
+              imagePullPolicy: {{ .Values.cleanup.image.pullPolicy }}
+              {{- if .Values.cleanup.command }}
+              command:
+                {{- toYaml .Values.cleanup.command | nindent 16 }}
+              {{- else }}
+              command:
+                - python
+                - -m
+                - app.workers.cleanup
+              {{- end }}
+              envFrom:
+                - configMapRef:
+                    name: {{ include "giftgen.fullname" . }}-config
+              {{- with .Values.cleanup.extraEnv }}
+              env:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              resources:
+                {{- toYaml .Values.cleanup.resources | nindent 16 }}
+{{- end }}
+

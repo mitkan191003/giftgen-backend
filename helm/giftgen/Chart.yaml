@@ -1,0 +1,7 @@
+apiVersion: v2
+name: giftgen
+description: GiftGen backend workloads for API, worker, migrations, and cleanup
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+

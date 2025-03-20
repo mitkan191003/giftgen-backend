@@ -63,3 +63,17 @@ The service layer is split behind adapters:
 - `AssetStore`: local filesystem or S3-backed artifact persistence
 
 These boundaries let the worker stay stable when provider details change.
+
+## Deployment Shape
+
+The first GitOps deployment slice packages the backend as:
+
+- an API image
+- a worker image
+- one Helm chart that defines API, worker, migrations, cleanup, and ingress
+
+Runtime configuration comes from Terraform outputs and AWS Secrets Manager instead of handwritten Kubernetes secrets:
+
+- Terraform bootstrap creates an IRSA role for the runtime service account
+- the chart passes secret ARNs as environment variables
+- the application resolves database, Modal, and OpenAI settings from Secrets Manager at startup

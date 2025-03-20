@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "giftgen.fullname" . }}-worker
+  labels:
+    {{- include "giftgen.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.worker.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "giftgen.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        {{- include "giftgen.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+      {{- with .Values.worker.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "giftgen.serviceAccountName" . }}
+      containers:
+        - name: worker
+          image: {{ include "giftgen.workerImage" . }}
+          imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+          {{- if .Values.worker.command }}
+          command:
+            {{- toYaml .Values.worker.command | nindent 12 }}
+          {{- else }}
+          command:
+            - python
+            - -m
+            - app.workers.generation
+            - --watch
+            - --interval
+            - {{ .Values.worker.intervalSeconds | quote }}
+          {{- end }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "giftgen.fullname" . }}-config
+          {{- with .Values.worker.extraEnv }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+

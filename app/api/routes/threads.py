@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -81,6 +83,7 @@ def create_message(
 
     if not thread.title:
         thread.title = guardrail.normalized_text[:72]
+    thread.updated_at = datetime.now(timezone.utc)
 
     user_message = ChatMessage(
         thread_id=thread.id,

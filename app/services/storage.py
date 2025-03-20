@@ -31,3 +31,13 @@ class AssetStore:
         path = target / filename
         path.write_bytes(data)
         return StoredAsset(bucket="local", key=str(path), size=len(data))
+
+    def delete(self, bucket: str, key: str) -> None:
+        if bucket == "local":
+            path = Path(key)
+            if path.exists():
+                path.unlink()
+            return
+
+        client = boto3.client("s3", region_name=self.settings.aws_region)
+        client.delete_object(Bucket=bucket, Key=key)

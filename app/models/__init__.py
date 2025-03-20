@@ -72,6 +72,7 @@ class User(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    auth_subject: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True, index=True)
     display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     auth_provider: Mapped[str] = mapped_column(String(50), default="development", nullable=False)
 

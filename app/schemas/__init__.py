@@ -81,6 +81,7 @@ class GenerationJobRead(APIModel):
 
 class CreationRead(APIModel):
     id: str
+    source_thread_id: str | None
     title: str
     final_prompt: str
     status: str
@@ -88,7 +89,7 @@ class CreationRead(APIModel):
     created_at: datetime
     updated_at: datetime
     last_accessed_at: datetime | None
-    assets: list[AssetRead] = []
+    assets: list[AssetRead] = Field(default_factory=list)
 
 
 class CreationEnvelope(BaseModel):

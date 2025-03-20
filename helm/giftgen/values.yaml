@@ -1,0 +1,106 @@
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+config:
+  environment: development
+  apiV1Prefix: /api/v1
+  authMode: cognito
+  corsOrigins: []
+  publicShareBaseUrl: ""
+  awsRegion: us-east-1
+  assetStorageMode: s3
+  assetBucketName: ""
+  databaseName: giftgen
+  databaseSecretId: ""
+  modalSecretId: ""
+  openaiSecretId: ""
+  enableJobDispatch: false
+  workerPollIntervalSeconds: 10
+  cleanupRetentionDays: 7
+  cognito:
+    region: us-east-1
+    userPoolId: ""
+    clientId: ""
+    domain: ""
+
+api:
+  replicaCount: 1
+  image:
+    repository: ""
+    tag: latest
+    pullPolicy: IfNotPresent
+  command: []
+  podAnnotations: {}
+  extraEnv: []
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  service:
+    port: 8000
+  ingress:
+    enabled: false
+    className: alb
+    annotations: {}
+    hosts:
+      - host: ""
+        paths:
+          - path: /
+            pathType: Prefix
+
+worker:
+  replicaCount: 1
+  image:
+    repository: ""
+    tag: latest
+    pullPolicy: IfNotPresent
+  command: []
+  intervalSeconds: 10
+  podAnnotations: {}
+  extraEnv: []
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+cleanup:
+  enabled: true
+  schedule: "0 */6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  image:
+    repository: ""
+    tag: ""
+    pullPolicy: IfNotPresent
+  command: []
+  extraEnv: []
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+migrations:
+  enabled: true
+  backoffLimit: 2
+  image:
+    repository: ""
+    tag: ""
+    pullPolicy: IfNotPresent
+  command: []
+  extraEnv: []
+
