@@ -4,11 +4,15 @@
 
 Terraform bootstrap is expected to supply:
 
-- image repositories and tags
+- image repositories
 - Cognito settings
 - the RDS, Modal, and OpenAI secret ARNs
 - the S3 assets bucket name
 - the IRSA role annotation for the runtime service account
+
+Environment-specific image tags now live in Git-managed values files such as:
+
+- `helm/giftgen/values-dev.yaml`
 
 The chart currently manages:
 
@@ -18,4 +22,4 @@ The chart currently manages:
 - pre-sync Alembic migration `Job`
 - API `Ingress`
 
-The chart does not yet install AWS Load Balancer Controller. The `Ingress` resource is already in place so that controller can be added in the next infra pass without reshaping the chart.
+The chart expects the cluster bootstrap layer to install AWS Load Balancer Controller and ExternalDNS.
