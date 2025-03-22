@@ -10,7 +10,7 @@ data:
   ENVIRONMENT: {{ .Values.config.environment | quote }}
   API_V1_PREFIX: {{ .Values.config.apiV1Prefix | quote }}
   AUTH_MODE: {{ .Values.config.authMode | quote }}
-  CORS_ORIGINS: {{ join "," .Values.config.corsOrigins | quote }}
+  CORS_ORIGINS: {{ .Values.config.corsOrigins | toJson | quote }}
   PUBLIC_SHARE_BASE_URL: {{ .Values.config.publicShareBaseUrl | quote }}
   AWS_REGION: {{ .Values.config.awsRegion | quote }}
   ASSET_STORAGE_MODE: {{ .Values.config.assetStorageMode | quote }}
