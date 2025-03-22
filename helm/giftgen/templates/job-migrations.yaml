@@ -7,8 +7,8 @@ metadata:
     {{- include "giftgen.labels" . | nindent 4 }}
     app.kubernetes.io/component: migrations
   annotations:
-    argocd.argoproj.io/hook: PreSync
-    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-options: Force=true,Replace=true
 spec:
   backoffLimit: {{ .Values.migrations.backoffLimit }}
   template:
@@ -40,4 +40,3 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
 {{- end }}
-

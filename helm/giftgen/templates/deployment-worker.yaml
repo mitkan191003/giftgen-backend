@@ -5,6 +5,8 @@ metadata:
   labels:
     {{- include "giftgen.labels" . | nindent 4 }}
     app.kubernetes.io/component: worker
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   replicas: {{ .Values.worker.replicaCount }}
   selector:
@@ -47,4 +49,3 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.worker.resources | nindent 12 }}
-

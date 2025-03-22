@@ -4,6 +4,8 @@ metadata:
   name: {{ include "giftgen.fullname" . }}-config
   labels:
     {{- include "giftgen.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
 data:
   ENVIRONMENT: {{ .Values.config.environment | quote }}
   API_V1_PREFIX: {{ .Values.config.apiV1Prefix | quote }}
@@ -24,4 +26,3 @@ data:
   COGNITO_USER_POOL_ID: {{ .Values.config.cognito.userPoolId | quote }}
   COGNITO_CLIENT_ID: {{ .Values.config.cognito.clientId | quote }}
   COGNITO_DOMAIN: {{ .Values.config.cognito.domain | quote }}
-

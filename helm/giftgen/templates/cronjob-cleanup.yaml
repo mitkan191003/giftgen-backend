@@ -6,6 +6,8 @@ metadata:
   labels:
     {{- include "giftgen.labels" . | nindent 4 }}
     app.kubernetes.io/component: cleanup
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   schedule: {{ .Values.cleanup.schedule | quote }}
   concurrencyPolicy: {{ .Values.cleanup.concurrencyPolicy }}
@@ -44,4 +46,3 @@ spec:
               resources:
                 {{- toYaml .Values.cleanup.resources | nindent 16 }}
 {{- end }}
-
