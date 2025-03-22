@@ -1,3 +1,4 @@
+import json
 from functools import lru_cache
 from typing import Annotated, Literal
 from urllib.parse import quote_plus
@@ -16,6 +17,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+pysqlite:///./giftgen.db"
     database_name: str = "giftgen"
     database_secret_id: str | None = None
+    database_endpoint: str | None = None
     cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=lambda: ["http://localhost:3000"])
 
     auth_mode: Literal["development", "cognito"] = "development"
@@ -47,6 +49,14 @@ class Settings(BaseSettings):
     @classmethod
     def split_origins(cls, value: str | list[str]) -> list[str]:
         if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return []
+            if stripped.startswith("["):
+                decoded = json.loads(stripped)
+                if not isinstance(decoded, list):
+                    raise ValueError("CORS_ORIGINS JSON value must decode to a list")
+                return [str(origin).strip() for origin in decoded if str(origin).strip()]
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
 
@@ -56,11 +66,32 @@ class Settings(BaseSettings):
 
         if self.database_secret_id and self.database_url.startswith("sqlite"):
             payload = get_secret_payload(self.database_secret_id, self.aws_region)
-            username = str(payload["username"])
-            password = str(payload["password"])
-            host = str(payload["host"])
-            port = int(payload.get("port", 5432))
-            dbname = str(payload.get("dbname") or self.database_name)
+            username = self._require_secret_value(
+                payload,
+                ("username", "user", "master_username"),
+                secret_id=self.database_secret_id,
+                field_name="username",
+            )
+            password = self._require_secret_value(
+                payload,
+                ("password", "master_password"),
+                secret_id=self.database_secret_id,
+                field_name="password",
+            )
+            host = self._optional_secret_value(payload, ("host", "hostname", "endpoint")) or self.database_endpoint
+            if not host:
+                raise RuntimeError(
+                    "Database secret did not contain a host value and DATABASE_ENDPOINT was not provided "
+                    f"for secret {self.database_secret_id}. Available keys: {sorted(payload.keys())}"
+                )
+
+            port_value = self._optional_secret_value(payload, ("port",), default="5432")
+            port = int(port_value)
+            dbname = self._optional_secret_value(
+                payload,
+                ("dbname", "database", "database_name", "dbName"),
+                default=self.database_name,
+            )
             self.database_url = (
                 "postgresql+psycopg://"
                 f"{quote_plus(username)}:{quote_plus(password)}@{host}:{port}/{quote_plus(dbname)}"
@@ -68,17 +99,66 @@ class Settings(BaseSettings):
 
         if self.modal_secret_id and not self.modal_api_url:
             payload = get_secret_payload(self.modal_secret_id, self.aws_region)
-            self.modal_api_url = str(payload["modal_api_url"])
-            self.modal_proxy_key = str(payload["modal_proxy_key"]) if payload.get("modal_proxy_key") else None
-            self.modal_proxy_secret = (
-                str(payload["modal_proxy_secret"]) if payload.get("modal_proxy_secret") else None
+            self.modal_api_url = self._require_secret_value(
+                payload,
+                ("modal_api_url", "api_url", "url"),
+                secret_id=self.modal_secret_id,
+                field_name="modal_api_url",
+            )
+            self.modal_proxy_key = self._optional_secret_value(
+                payload,
+                ("modal_proxy_key", "proxy_key"),
+            )
+            self.modal_proxy_secret = self._optional_secret_value(
+                payload,
+                ("modal_proxy_secret", "proxy_secret"),
             )
 
         if self.openai_secret_id and not self.openai_api_key:
             payload = get_secret_payload(self.openai_secret_id, self.aws_region)
-            self.openai_api_key = str(payload["api_key"])
+            self.openai_api_key = self._require_secret_value(
+                payload,
+                ("api_key", "openai_api_key"),
+                secret_id=self.openai_secret_id,
+                field_name="api_key",
+            )
 
         return self
+
+    @staticmethod
+    def _optional_secret_value(
+        payload: dict[str, object],
+        field_names: tuple[str, ...],
+        default: str | None = None,
+    ) -> str | None:
+        for field_name in field_names:
+            value = payload.get(field_name)
+            if value is None:
+                continue
+            if isinstance(value, str):
+                stripped = value.strip()
+                if stripped:
+                    return stripped
+                continue
+            return str(value)
+        return default
+
+    @classmethod
+    def _require_secret_value(
+        cls,
+        payload: dict[str, object],
+        field_names: tuple[str, ...],
+        *,
+        secret_id: str,
+        field_name: str,
+    ) -> str:
+        value = cls._optional_secret_value(payload, field_names)
+        if value:
+            return value
+
+        raise RuntimeError(
+            f"Secret {secret_id} did not contain a usable {field_name}. Available keys: {sorted(payload.keys())}"
+        )
 
 
 @lru_cache

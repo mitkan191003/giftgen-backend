@@ -17,6 +17,7 @@ config:
   assetBucketName: ""
   databaseName: giftgen
   databaseSecretId: ""
+  databaseEndpoint: ""
   modalSecretId: ""
   openaiSecretId: ""
   enableJobDispatch: false
@@ -103,4 +104,3 @@ migrations:
     pullPolicy: IfNotPresent
   command: []
   extraEnv: []
-

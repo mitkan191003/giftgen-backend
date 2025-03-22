@@ -52,10 +52,16 @@ COGNITO_DOMAIN=https://your-prefix.auth.us-east-1.amazoncognito.com
 For the deployed EKS path, the preferred runtime inputs are:
 
 - `DATABASE_SECRET_ID`
+- `DATABASE_ENDPOINT`
 - `MODAL_SECRET_ID`
 - `OPENAI_SECRET_ID`
 
 The application resolves those values from AWS Secrets Manager at startup, so the first deployment path does not need handwritten Kubernetes secrets for database or provider credentials.
+
+Database note:
+
+- RDS-managed Secrets Manager payloads are not treated as the sole source of connection metadata anymore.
+- The runtime can now combine `DATABASE_SECRET_ID` with `DATABASE_ENDPOINT`, which makes startup resilient if the secret only contains credentials and not the hostname.
 
 ## Containers And Helm
 

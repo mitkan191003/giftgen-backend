@@ -17,6 +17,7 @@ data:
   ASSET_BUCKET_NAME: {{ .Values.config.assetBucketName | quote }}
   DATABASE_NAME: {{ .Values.config.databaseName | quote }}
   DATABASE_SECRET_ID: {{ .Values.config.databaseSecretId | quote }}
+  DATABASE_ENDPOINT: {{ .Values.config.databaseEndpoint | quote }}
   MODAL_SECRET_ID: {{ .Values.config.modalSecretId | quote }}
   OPENAI_SECRET_ID: {{ .Values.config.openaiSecretId | quote }}
   ENABLE_JOB_DISPATCH: {{ ternary "true" "false" .Values.config.enableJobDispatch | quote }}
