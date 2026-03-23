@@ -82,6 +82,7 @@ def process_next_job() -> bool:
             creation.status = CreationStatus.ready.value
             job.error_message = None
             duration_ms = (perf_counter() - started_at) * 1000
+            db.commit()
             emit_metrics(
                 [
                     MetricValue(name="GenerationCompletedCount", value=1),
@@ -105,6 +106,7 @@ def process_next_job() -> bool:
                     "asset_size_bytes": stored.size,
                 },
             )
+            return True
         except Exception as exc:
             job.status = GenerationStatus.failed.value
             job.completed_at = datetime.now(timezone.utc)
