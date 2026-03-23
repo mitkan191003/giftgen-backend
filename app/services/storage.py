@@ -17,12 +17,22 @@ class AssetStore:
     def __init__(self) -> None:
         self.settings = get_settings()
 
-    def store_bytes(self, creation_id: str, filename: str, data: bytes) -> StoredAsset:
+    def store_bytes(
+        self,
+        creation_id: str,
+        filename: str,
+        data: bytes,
+        *,
+        content_type: str | None = None,
+    ) -> StoredAsset:
         if self.settings.asset_storage_mode == "s3":
             bucket = self.settings.asset_bucket_name
             key = f"creations/{creation_id}/{filename}"
             client = boto3.client("s3", region_name=self.settings.aws_region)
-            client.put_object(Bucket=bucket, Key=key, Body=data)
+            put_object_args = {"Bucket": bucket, "Key": key, "Body": data}
+            if content_type:
+                put_object_args["ContentType"] = content_type
+            client.put_object(**put_object_args)
             return StoredAsset(bucket=bucket, key=key, size=len(data))
 
         root = Path(self.settings.local_asset_root)

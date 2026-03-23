@@ -65,6 +65,7 @@ def process_next_job() -> bool:
                 creation.id,
                 f"{job.id}.{artifact.file_extension}",
                 artifact.data,
+                content_type=artifact.mime_type,
             )
             db.add(
                 Asset(

@@ -92,8 +92,16 @@ class ModalGenerationClient:
             self.logger.warning("modal_request_failed", extra={"outcome": "invalid_payload", "duration_ms": round(duration_ms, 2)})
             raise RuntimeError("Modal response did not include model_data")
 
-        file_extension = payload.get("format", "glb")
-        mime_type = "model/gltf-binary" if file_extension == "glb" else "application/octet-stream"
+        if isinstance(model_data, str) and "," in model_data and model_data.startswith("data:"):
+            model_data = model_data.split(",", 1)[1]
+
+        file_extension = str(payload.get("format", "glb")).strip().lower().lstrip(".")
+        mime_type = {
+            "glb": "model/gltf-binary",
+            "gltf": "model/gltf+json",
+            "ply": "application/octet-stream",
+            "obj": "text/plain",
+        }.get(file_extension, "application/octet-stream")
         provider_job_id = (
             payload.get("provider_job_id")
             or payload.get("job_id")
