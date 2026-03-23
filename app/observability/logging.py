@@ -67,6 +67,16 @@ class JsonLogFormatter(logging.Formatter):
         return json.dumps(payload, default=str)
 
 
+class ContextLoggerAdapter(logging.LoggerAdapter[Any]):
+    def process(self, msg: str, kwargs: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+        merged_extra = dict(self.extra)
+        call_extra = kwargs.get("extra")
+        if isinstance(call_extra, dict):
+            merged_extra.update(call_extra)
+        kwargs["extra"] = merged_extra
+        return msg, kwargs
+
+
 def configure_logging() -> None:
     settings = get_settings()
     level = getattr(logging, settings.log_level.upper(), logging.INFO)
@@ -88,4 +98,4 @@ def configure_logging() -> None:
 
 def get_logger(name: str) -> logging.LoggerAdapter[Any]:
     settings = get_settings()
-    return logging.LoggerAdapter(logging.getLogger(name), {"service": settings.service_name})
+    return ContextLoggerAdapter(logging.getLogger(name), {"service": settings.service_name})
