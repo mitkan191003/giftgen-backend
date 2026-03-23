@@ -10,16 +10,18 @@ Terraform bootstrap is expected to supply:
 - the S3 assets bucket name
 - the IRSA role annotation for the runtime service account
 
-Environment-specific image tags now live in Git-managed values files such as:
+Environment-specific placeholder image tags live in values files such as:
 
 - `helm/giftgen/values-dev.yaml`
+
+For the pipeline-managed dev path, ArgoCD overrides those tags with the source commit SHA at deploy time.
 
 The chart currently manages:
 
 - API deployment and service
 - worker deployment
 - cleanup `CronJob`
-- pre-sync Alembic migration `Job`
+- Alembic migration `Job` ordered before the API and worker with Argo sync waves
 - API `Ingress`
 
 The chart expects the cluster bootstrap layer to install AWS Load Balancer Controller and ExternalDNS.

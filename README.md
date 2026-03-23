@@ -69,6 +69,8 @@ This repo now includes:
 
 - `Dockerfile.api`
 - `Dockerfile.worker`
+- `buildspec.images.yml`
+- `buildspec.deploy.yml`
 - `helm/giftgen`
 
 The Helm chart deploys:
@@ -76,8 +78,10 @@ The Helm chart deploys:
 - API deployment and service
 - worker deployment
 - cleanup `CronJob`
-- pre-sync Alembic migration `Job`
+- Alembic migration `Job` ordered before the API and worker with Argo sync waves
 - optional API `Ingress`
+
+If you enable the AWS delivery path in Terraform, CodeBuild uses `buildspec.images.yml` to build and push both backend images using the source commit SHA as the image tag. If you also enable the optional refresh stage, `buildspec.deploy.yml` updates the ArgoCD `Application` to use that same commit SHA for both `targetRevision` and the Helm image-tag overrides before syncing.
 
 ## Initial Surface
 

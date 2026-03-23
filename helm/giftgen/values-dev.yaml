@@ -1,7 +1,9 @@
 api:
   image:
-    tag: v2
+    # The delivery pipeline overrides this with the source commit SHA in Argo CD.
+    tag: managed-by-pipeline
 
 worker:
   image:
-    tag: v2
+    # The delivery pipeline overrides this with the source commit SHA in Argo CD.
+    tag: managed-by-pipeline
