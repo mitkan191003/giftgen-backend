@@ -1,6 +1,7 @@
 import json
 from functools import lru_cache
 from typing import Annotated, Literal
+from urllib.parse import urlsplit
 from urllib.parse import quote_plus
 
 from pydantic import Field, field_validator, model_validator
@@ -86,7 +87,7 @@ class Settings(BaseSettings):
                 )
 
             port_value = self._optional_secret_value(payload, ("port",), default="5432")
-            port = int(port_value)
+            host, port = self._normalize_database_endpoint(host, int(port_value))
             dbname = self._optional_secret_value(
                 payload,
                 ("dbname", "database", "database_name", "dbName"),
@@ -159,6 +160,13 @@ class Settings(BaseSettings):
         raise RuntimeError(
             f"Secret {secret_id} did not contain a usable {field_name}. Available keys: {sorted(payload.keys())}"
         )
+
+    @staticmethod
+    def _normalize_database_endpoint(endpoint: str, default_port: int) -> tuple[str, int]:
+        parsed = urlsplit(f"//{endpoint}")
+        host = parsed.hostname or endpoint
+        port = parsed.port or default_port
+        return host, port
 
 
 @lru_cache

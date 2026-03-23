@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from sqlalchemy.engine import make_url
+
 import app.services.aws_secrets as aws_secrets
 from app.core.config import Settings
 
@@ -70,6 +72,56 @@ def test_settings_build_database_url_from_secret_and_endpoint_fallback(monkeypat
         == "postgresql+psycopg://giftgen_admin:super-secret@"
         "giftgen-dev-postgres.abc123.us-east-1.rds.amazonaws.com:5432/giftgen"
     )
+
+
+def test_settings_build_database_url_from_endpoint_with_embedded_port(monkeypatch) -> None:
+    clear_settings_env(monkeypatch)
+    monkeypatch.setenv("DATABASE_SECRET_ID", "db-secret")
+    monkeypatch.setenv("DATABASE_ENDPOINT", "giftgen-dev-postgres.abc123.us-east-1.rds.amazonaws.com:5432")
+    monkeypatch.setenv("DATABASE_NAME", "giftgen")
+
+    def fake_get_secret_payload(secret_id: str, region_name: str) -> dict[str, object]:
+        assert secret_id == "db-secret"
+        assert region_name == "us-east-1"
+        return {
+            "username": "giftgen",
+            "password": "super-secret",
+            "port": 5432,
+        }
+
+    monkeypatch.setattr(aws_secrets, "get_secret_payload", fake_get_secret_payload)
+
+    settings = Settings()
+
+    assert (
+        settings.database_url
+        == "postgresql+psycopg://giftgen:super-secret@"
+        "giftgen-dev-postgres.abc123.us-east-1.rds.amazonaws.com:5432/giftgen"
+    )
+
+
+def test_settings_database_url_with_special_characters_is_sqlalchemy_parseable(monkeypatch) -> None:
+    clear_settings_env(monkeypatch)
+    monkeypatch.setenv("DATABASE_SECRET_ID", "db-secret")
+    monkeypatch.setenv("DATABASE_ENDPOINT", "giftgen-dev-postgres.abc123.us-east-1.rds.amazonaws.com")
+    monkeypatch.setenv("DATABASE_NAME", "giftgen")
+
+    def fake_get_secret_payload(secret_id: str, region_name: str) -> dict[str, object]:
+        return {
+            "username": "giftgen",
+            "password": ".I3Hjw7:mbCXY9TR.6C~-7X$F~FS",
+            "port": 5432,
+        }
+
+    monkeypatch.setattr(aws_secrets, "get_secret_payload", fake_get_secret_payload)
+
+    settings = Settings()
+    parsed = make_url(settings.database_url)
+
+    assert parsed.username == "giftgen"
+    assert parsed.password == ".I3Hjw7:mbCXY9TR.6C~-7X$F~FS"
+    assert parsed.host == "giftgen-dev-postgres.abc123.us-east-1.rds.amazonaws.com"
+    assert parsed.port == 5432
 
 
 def test_settings_error_when_database_host_missing_everywhere(monkeypatch) -> None:
