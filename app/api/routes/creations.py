@@ -17,6 +17,34 @@ settings = get_settings()
 logger = get_logger("giftgen.creations")
 
 
+def _serialize_asset(asset) -> AssetRead:
+    return AssetRead(
+        id=asset.id,
+        asset_type=asset.asset_type,
+        storage_bucket=asset.storage_bucket,
+        storage_key=asset.storage_key,
+        mime_type=asset.mime_type,
+        file_size=asset.file_size,
+        download_url=f"{settings.api_v1_prefix}/assets/{asset.id}/content",
+        created_at=asset.created_at,
+    )
+
+
+def _serialize_creation(creation: Creation) -> CreationRead:
+    return CreationRead(
+        id=creation.id,
+        source_thread_id=creation.source_thread_id,
+        title=creation.title,
+        final_prompt=creation.final_prompt,
+        status=creation.status,
+        visibility=creation.visibility,
+        created_at=creation.created_at,
+        updated_at=creation.updated_at,
+        last_accessed_at=creation.last_accessed_at,
+        assets=[_serialize_asset(asset) for asset in creation.assets],
+    )
+
+
 @router.post("/creations", response_model=CreationEnvelope)
 def create_creation(
     payload: CreationCreate,
@@ -90,24 +118,9 @@ def list_creations(
     now = datetime.now(timezone.utc)
     for creation in creations:
         creation.last_accessed_at = now
+    response = [_serialize_creation(creation) for creation in creations]
     db.commit()
-    return [
-        CreationRead.model_validate(
-            {
-                **creation.__dict__,
-                "assets": [
-                    AssetRead.model_validate(
-                        {
-                            **asset.__dict__,
-                            "download_url": f"{settings.api_v1_prefix}/assets/{asset.id}/content",
-                        }
-                    )
-                    for asset in creation.assets
-                ],
-            }
-        )
-        for creation in creations
-    ]
+    return response
 
 
 @router.get("/jobs/{job_id}", response_model=GenerationJobRead)
