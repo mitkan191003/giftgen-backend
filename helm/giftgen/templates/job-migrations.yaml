@@ -35,8 +35,12 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "giftgen.fullname" . }}-config
-          {{- with .Values.migrations.extraEnv }}
           env:
+            - name: SERVICE_NAME
+              value: giftgen-migrations
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          {{- with .Values.migrations.extraEnv }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
 {{- end }}

@@ -39,6 +39,7 @@ spec:
             - 0.0.0.0
             - --port
             - "8000"
+            - --no-access-log
           {{- end }}
           ports:
             - name: http
@@ -47,8 +48,12 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "giftgen.fullname" . }}-config
-          {{- with .Values.api.extraEnv }}
           env:
+            - name: SERVICE_NAME
+              value: giftgen-api
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          {{- with .Values.api.extraEnv }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
           readinessProbe:

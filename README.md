@@ -30,6 +30,18 @@ PUBLIC_SHARE_BASE_URL=http://localhost:3000/share
 
 Authenticated routes accept `X-Dev-User-Email` while `AUTH_MODE=development`.
 
+Observability-related envs:
+
+```env
+SERVICE_NAME=giftgen-api
+LOG_LEVEL=INFO
+METRIC_NAMESPACE=GiftGen/Application
+REQUEST_ID_HEADER_NAME=X-Request-Id
+SENTRY_DSN=
+SENTRY_TRACES_SAMPLE_RATE=0.1
+SENTRY_ENABLE_LOGS=false
+```
+
 ## Production Notes
 
 - For Cognito-backed environments set:
@@ -62,6 +74,24 @@ Database note:
 
 - RDS-managed Secrets Manager payloads are not treated as the sole source of connection metadata anymore.
 - The runtime can now combine `DATABASE_SECRET_ID` with `DATABASE_ENDPOINT`, which makes startup resilient if the secret only contains credentials and not the hostname.
+
+## Observability
+
+The backend now emits:
+
+- structured JSON logs for API, worker, and cleanup
+- request IDs on every API response
+- CloudWatch Embedded Metric Format metrics for request, auth, generation, Modal, prompt refinement, and cleanup activity
+- optional Sentry events if `SENTRY_DSN` is set
+
+The request correlation path is:
+
+1. frontend generates `X-Request-Id`
+2. API returns the same request ID in the response header
+3. backend logs include `request_id`
+4. worker logs include `job_id` and `creation_id`
+
+Use the log and metric names documented in [Observability.md](/home/mithrak/giftgen/Observability.md).
 
 ## Containers And Helm
 

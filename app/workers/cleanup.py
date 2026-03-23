@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from time import perf_counter
 
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -8,7 +9,20 @@ from sqlalchemy.orm import selectinload
 from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.models import Creation, CreationStatus, GenerationJob, GenerationStatus
+from app.observability import (
+    clear_request_context,
+    configure_logging,
+    configure_sentry,
+    emit_metrics,
+    get_logger,
+    set_request_context,
+)
+from app.observability.metrics import MetricValue
 from app.services.storage import AssetStore
+
+configure_logging()
+configure_sentry()
+logger = get_logger("giftgen.worker.cleanup")
 
 
 def run_cleanup() -> dict[str, int]:
@@ -76,8 +90,36 @@ def run_cleanup() -> dict[str, int]:
 
 
 def main() -> None:
-    result = run_cleanup()
-    print(result)
+    set_request_context(f"cleanup:{datetime.now(timezone.utc).isoformat()}")
+    started_at = perf_counter()
+    try:
+        result = run_cleanup()
+        duration_ms = (perf_counter() - started_at) * 1000
+        emit_metrics(
+            [
+                MetricValue(name="CleanupRunCount", value=1),
+                MetricValue(name="CleanupDurationMs", value=duration_ms, unit="Milliseconds"),
+                MetricValue(name="CleanupExpiredJobs", value=result["expired_jobs"]),
+                MetricValue(name="CleanupDeletedCreations", value=result["deleted_creations"]),
+                MetricValue(name="CleanupDeletedAssets", value=result["deleted_assets"]),
+            ],
+            dimensions={"Outcome": "succeeded"},
+        )
+        logger.info("cleanup_completed", extra={**result, "duration_ms": round(duration_ms, 2)})
+        print(result)
+    except Exception:
+        duration_ms = (perf_counter() - started_at) * 1000
+        emit_metrics(
+            [
+                MetricValue(name="CleanupRunCount", value=1),
+                MetricValue(name="CleanupDurationMs", value=duration_ms, unit="Milliseconds"),
+            ],
+            dimensions={"Outcome": "failed"},
+        )
+        logger.exception("cleanup_failed", extra={"duration_ms": round(duration_ms, 2)})
+        raise
+    finally:
+        clear_request_context()
 
 
 if __name__ == "__main__":

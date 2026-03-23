@@ -8,6 +8,13 @@ from app.core.config import Settings
 
 def clear_settings_env(monkeypatch) -> None:
     for key in (
+        "SERVICE_NAME",
+        "LOG_LEVEL",
+        "METRIC_NAMESPACE",
+        "REQUEST_ID_HEADER_NAME",
+        "SENTRY_DSN",
+        "SENTRY_TRACES_SAMPLE_RATE",
+        "SENTRY_ENABLE_LOGS",
         "DATABASE_URL",
         "DATABASE_NAME",
         "DATABASE_SECRET_ID",

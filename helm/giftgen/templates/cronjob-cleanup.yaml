@@ -39,8 +39,12 @@ spec:
               envFrom:
                 - configMapRef:
                     name: {{ include "giftgen.fullname" . }}-config
-              {{- with .Values.cleanup.extraEnv }}
               env:
+                - name: SERVICE_NAME
+                  value: giftgen-cleanup
+                - name: PYTHONUNBUFFERED
+                  value: "1"
+              {{- with .Values.cleanup.extraEnv }}
                 {{- toYaml . | nindent 16 }}
               {{- end }}
               resources:

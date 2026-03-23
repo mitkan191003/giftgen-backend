@@ -9,6 +9,12 @@ metadata:
 data:
   ENVIRONMENT: {{ .Values.config.environment | quote }}
   API_V1_PREFIX: {{ .Values.config.apiV1Prefix | quote }}
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  METRIC_NAMESPACE: {{ .Values.config.metricNamespace | quote }}
+  REQUEST_ID_HEADER_NAME: {{ .Values.config.requestIdHeaderName | quote }}
+  SENTRY_DSN: {{ .Values.config.sentryDsn | quote }}
+  SENTRY_TRACES_SAMPLE_RATE: {{ .Values.config.sentryTracesSampleRate | quote }}
+  SENTRY_ENABLE_LOGS: {{ ternary "true" "false" .Values.config.sentryEnableLogs | quote }}
   AUTH_MODE: {{ .Values.config.authMode | quote }}
   CORS_ORIGINS: {{ .Values.config.corsOrigins | toJson | quote }}
   PUBLIC_SHARE_BASE_URL: {{ .Values.config.publicShareBaseUrl | quote }}

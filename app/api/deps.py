@@ -7,11 +7,14 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.models import User
+from app.observability import emit_metric, get_logger, set_user_id
 from app.services.cognito import (
     CognitoAuthenticationError,
     CognitoConfigurationError,
     get_cognito_verifier,
 )
+
+logger = get_logger("giftgen.auth")
 
 
 def get_current_user(
@@ -23,6 +26,8 @@ def get_current_user(
     settings = get_settings()
     if settings.auth_mode == "cognito":
         if not authorization or not authorization.lower().startswith("bearer "):
+            emit_metric("AuthFailureCount", 1, dimensions={"Outcome": "missing_bearer"})
+            logger.warning("auth_failed", extra={"reason": "missing_bearer"})
             raise HTTPException(
                 status_code=401,
                 detail="Missing bearer token",
@@ -33,8 +38,12 @@ def get_current_user(
         try:
             identity = get_cognito_verifier().verify(token)
         except CognitoConfigurationError as exc:
+            emit_metric("AuthFailureCount", 1, dimensions={"Outcome": "config_error"})
+            logger.exception("auth_failed", extra={"reason": "config_error"})
             raise HTTPException(status_code=500, detail=str(exc)) from exc
         except CognitoAuthenticationError as exc:
+            emit_metric("AuthFailureCount", 1, dimensions={"Outcome": "invalid_token"})
+            logger.warning("auth_failed", extra={"reason": "invalid_token"})
             raise HTTPException(
                 status_code=401,
                 detail=str(exc),
@@ -45,6 +54,8 @@ def get_current_user(
         if user is None:
             user = db.scalar(select(User).where(User.email == identity.email))
             if user is not None and user.auth_subject and user.auth_subject != identity.subject:
+                emit_metric("AuthFailureCount", 1, dimensions={"Outcome": "identity_conflict"})
+                logger.warning("auth_failed", extra={"reason": "identity_conflict"})
                 raise HTTPException(status_code=409, detail="Email is already linked to another identity")
 
         if user is None:
@@ -57,6 +68,7 @@ def get_current_user(
             db.add(user)
             db.commit()
             db.refresh(user)
+            set_user_id(str(user.id))
             return user
 
         changed = False
@@ -75,6 +87,7 @@ def get_current_user(
         if changed:
             db.commit()
             db.refresh(user)
+        set_user_id(str(user.id))
         return user
 
     email = (x_dev_user_email or "demo@giftgen.local").strip().lower()
@@ -89,4 +102,5 @@ def get_current_user(
         db.commit()
         db.refresh(user)
 
+    set_user_id(str(user.id))
     return user

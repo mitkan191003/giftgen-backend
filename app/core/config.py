@@ -14,6 +14,13 @@ class Settings(BaseSettings):
     app_name: str = "GiftGen API"
     environment: Literal["development", "staging", "production"] = "development"
     api_v1_prefix: str = "/api/v1"
+    service_name: str = "giftgen-api"
+    log_level: str = "INFO"
+    metric_namespace: str = "GiftGen/Application"
+    request_id_header_name: str = "X-Request-Id"
+    sentry_dsn: str | None = None
+    sentry_traces_sample_rate: float = 0.1
+    sentry_enable_logs: bool = False
 
     database_url: str = "sqlite+pysqlite:///./giftgen.db"
     database_name: str = "giftgen"

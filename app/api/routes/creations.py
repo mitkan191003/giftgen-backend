@@ -8,11 +8,13 @@ from app.api.deps import get_current_user
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.models import ChatThread, Creation, CreationStatus, GenerationJob, GenerationStatus, User
+from app.observability import emit_metric, get_logger
 from app.schemas import AssetRead, CreationCreate, CreationEnvelope, CreationRead, GenerationJobRead
 from app.services.guardrails import PromptGuardrailService
 
 router = APIRouter()
 settings = get_settings()
+logger = get_logger("giftgen.creations")
 
 
 @router.post("/creations", response_model=CreationEnvelope)
@@ -23,6 +25,8 @@ def create_creation(
 ) -> CreationEnvelope:
     guardrail = PromptGuardrailService().inspect(payload.prompt)
     if not guardrail.allowed:
+        emit_metric("GenerationSubmissionCount", 1, dimensions={"Outcome": "rejected_guardrail"})
+        logger.warning("creation_rejected", extra={"reasons": guardrail.reasons})
         raise HTTPException(
             status_code=400,
             detail={"message": "Prompt rejected by guardrails", "reasons": guardrail.reasons},
@@ -37,6 +41,7 @@ def create_creation(
             )
         )
         if source_thread is None:
+            emit_metric("GenerationSubmissionCount", 1, dimensions={"Outcome": "missing_thread"})
             raise HTTPException(status_code=404, detail="Thread not found")
         source_thread.updated_at = datetime.now(timezone.utc)
 
@@ -58,6 +63,11 @@ def create_creation(
     db.commit()
     db.refresh(creation)
     db.refresh(job)
+    emit_metric("GenerationSubmissionCount", 1, dimensions={"Outcome": "queued"})
+    logger.info(
+        "creation_queued",
+        extra={"creation_id": creation.id, "job_id": job.id, "visibility": creation.visibility},
+    )
 
     return CreationEnvelope(
         creation=CreationRead.model_validate(creation),
