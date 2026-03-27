@@ -13,6 +13,7 @@ Terraform bootstrap is expected to supply:
 Environment-specific placeholder image tags live in values files such as:
 
 - `helm/giftgen/values-dev.yaml`
+- `helm/giftgen/values-prod.yaml`
 
 For the pipeline-managed dev path, ArgoCD overrides those tags with the source commit SHA at deploy time.
 
