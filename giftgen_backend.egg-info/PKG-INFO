@@ -1,3 +1,22 @@
+Metadata-Version: 2.4
+Name: giftgen-backend
+Version: 0.1.0
+Summary: Gift generation backend API and worker
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+Requires-Dist: alembic<2.0.0,>=1.14.1
+Requires-Dist: boto3<2.0.0,>=1.37.0
+Requires-Dist: fastapi<1.0.0,>=0.115.12
+Requires-Dist: httpx<1.0.0,>=0.28.1
+Requires-Dist: PyJWT[crypto]<3.0.0,>=2.10.1
+Requires-Dist: psycopg[binary]<4.0.0,>=3.2.9
+Requires-Dist: pydantic-settings<3.0.0,>=2.8.1
+Requires-Dist: sqlalchemy<3.0.0,>=2.0.39
+Requires-Dist: uvicorn[standard]<1.0.0,>=0.34.0
+Provides-Extra: dev
+Requires-Dist: pytest<9.0.0,>=8.3.5; extra == "dev"
+Requires-Dist: ruff<1.0.0,>=0.11.0; extra == "dev"
+
 # GiftGen Backend
 
 FastAPI application for chat orchestration, creation metadata, sharing, and generation job management.
@@ -29,18 +48,6 @@ PUBLIC_SHARE_BASE_URL=http://localhost:3000/share
 ```
 
 Authenticated routes accept `X-Dev-User-Email` while `AUTH_MODE=development`.
-
-Observability-related envs:
-
-```env
-SERVICE_NAME=giftgen-api
-LOG_LEVEL=INFO
-METRIC_NAMESPACE=GiftGen/Application
-REQUEST_ID_HEADER_NAME=X-Request-Id
-SENTRY_DSN=
-SENTRY_TRACES_SAMPLE_RATE=0.1
-SENTRY_ENABLE_LOGS=false
-```
 
 ## Production Notes
 
@@ -75,24 +82,6 @@ Database note:
 - RDS-managed Secrets Manager payloads are not treated as the sole source of connection metadata anymore.
 - The runtime can now combine `DATABASE_SECRET_ID` with `DATABASE_ENDPOINT`, which makes startup resilient if the secret only contains credentials and not the hostname.
 
-## Observability
-
-The backend now emits:
-
-- structured JSON logs for API, worker, and cleanup
-- request IDs on every API response
-- CloudWatch Embedded Metric Format metrics for request, auth, generation, Modal, prompt refinement, and cleanup activity
-- optional Sentry events if `SENTRY_DSN` is set
-
-The request correlation path is:
-
-1. frontend generates `X-Request-Id`
-2. API returns the same request ID in the response header
-3. backend logs include `request_id`
-4. worker logs include `job_id` and `creation_id`
-
-Use the log and metric names documented in [Observability.md](/home/mithrak/giftgen/Observability.md).
-
 ## Containers And Helm
 
 This repo now includes:
@@ -122,16 +111,6 @@ python3 scripts/check_runtime_config.py
 ```
 
 That validates the resolved runtime settings and ensures SQLAlchemy can parse and construct an engine from the computed database URL without making a live database connection.
-
-To validate the deployed AWS path instead of the local sqlite default, run it with the same DB env shape the pod uses, for example:
-
-```bash
-cd backend
-DATABASE_URL= \
-DATABASE_SECRET_ID=<rds-secret-arn-or-name> \
-DATABASE_ENDPOINT=<rds-endpoint> \
-python3 scripts/check_runtime_config.py
-```
 
 ## Initial Surface
 

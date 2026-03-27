@@ -4,17 +4,26 @@ metadata:
   name: {{ include "giftgen.fullname" . }}-config
   labels:
     {{- include "giftgen.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
 data:
   ENVIRONMENT: {{ .Values.config.environment | quote }}
   API_V1_PREFIX: {{ .Values.config.apiV1Prefix | quote }}
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  METRIC_NAMESPACE: {{ .Values.config.metricNamespace | quote }}
+  REQUEST_ID_HEADER_NAME: {{ .Values.config.requestIdHeaderName | quote }}
+  SENTRY_DSN: {{ .Values.config.sentryDsn | quote }}
+  SENTRY_TRACES_SAMPLE_RATE: {{ .Values.config.sentryTracesSampleRate | quote }}
+  SENTRY_ENABLE_LOGS: {{ ternary "true" "false" .Values.config.sentryEnableLogs | quote }}
   AUTH_MODE: {{ .Values.config.authMode | quote }}
-  CORS_ORIGINS: {{ join "," .Values.config.corsOrigins | quote }}
+  CORS_ORIGINS: {{ .Values.config.corsOrigins | toJson | quote }}
   PUBLIC_SHARE_BASE_URL: {{ .Values.config.publicShareBaseUrl | quote }}
   AWS_REGION: {{ .Values.config.awsRegion | quote }}
   ASSET_STORAGE_MODE: {{ .Values.config.assetStorageMode | quote }}
   ASSET_BUCKET_NAME: {{ .Values.config.assetBucketName | quote }}
   DATABASE_NAME: {{ .Values.config.databaseName | quote }}
   DATABASE_SECRET_ID: {{ .Values.config.databaseSecretId | quote }}
+  DATABASE_ENDPOINT: {{ .Values.config.databaseEndpoint | quote }}
   MODAL_SECRET_ID: {{ .Values.config.modalSecretId | quote }}
   OPENAI_SECRET_ID: {{ .Values.config.openaiSecretId | quote }}
   ENABLE_JOB_DISPATCH: {{ ternary "true" "false" .Values.config.enableJobDispatch | quote }}
@@ -24,4 +33,3 @@ data:
   COGNITO_USER_POOL_ID: {{ .Values.config.cognito.userPoolId | quote }}
   COGNITO_CLIENT_ID: {{ .Values.config.cognito.clientId | quote }}
   COGNITO_DOMAIN: {{ .Values.config.cognito.domain | quote }}
-

@@ -1,0 +1,3 @@
+[console_scripts]
+giftgen-cleanup = app.workers.cleanup:main
+giftgen-worker = app.workers.generation:main

@@ -5,6 +5,8 @@ metadata:
   labels:
     {{- include "giftgen.labels" . | nindent 4 }}
     app.kubernetes.io/component: api
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   replicas: {{ .Values.api.replicaCount }}
   selector:
@@ -37,6 +39,7 @@ spec:
             - 0.0.0.0
             - --port
             - "8000"
+            - --no-access-log
           {{- end }}
           ports:
             - name: http
@@ -45,8 +48,12 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "giftgen.fullname" . }}-config
-          {{- with .Values.api.extraEnv }}
           env:
+            - name: SERVICE_NAME
+              value: giftgen-api
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          {{- with .Values.api.extraEnv }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
           readinessProbe:
@@ -63,4 +70,3 @@ spec:
             periodSeconds: 20
           resources:
             {{- toYaml .Values.api.resources | nindent 12 }}
-

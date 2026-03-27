@@ -1,8 +1,9 @@
 from pathlib import Path
+from typing import Iterator
 
 import boto3
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -14,6 +15,14 @@ from app.models import Asset, Creation, Share, User
 router = APIRouter()
 
 
+def _iter_s3_body(body) -> Iterator[bytes]:
+    try:
+        while chunk := body.read(1024 * 1024):
+            yield chunk
+    finally:
+        body.close()
+
+
 def _serve_asset(asset: Asset):
     settings = get_settings()
     if asset.storage_bucket == "local":
@@ -23,12 +32,23 @@ def _serve_asset(asset: Asset):
         return FileResponse(path=path, media_type=asset.mime_type, filename=path.name)
 
     client = boto3.client("s3", region_name=settings.aws_region)
-    url = client.generate_presigned_url(
-        "get_object",
-        Params={"Bucket": asset.storage_bucket, "Key": asset.storage_key},
-        ExpiresIn=3600,
+    response = client.get_object(
+        Bucket=asset.storage_bucket,
+        Key=asset.storage_key,
     )
-    return RedirectResponse(url=url, status_code=307)
+    headers = {
+        "Content-Length": str(response.get("ContentLength", asset.file_size)),
+        "Cache-Control": "private, max-age=3600",
+    }
+
+    if response.get("ETag"):
+        headers["ETag"] = str(response["ETag"]).strip('"')
+
+    return StreamingResponse(
+        _iter_s3_body(response["Body"]),
+        media_type=asset.mime_type,
+        headers=headers,
+    )
 
 
 @router.get("/assets/{asset_id}/content")

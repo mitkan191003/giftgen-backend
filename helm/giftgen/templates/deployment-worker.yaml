@@ -5,6 +5,8 @@ metadata:
   labels:
     {{- include "giftgen.labels" . | nindent 4 }}
     app.kubernetes.io/component: worker
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   replicas: {{ .Values.worker.replicaCount }}
   selector:
@@ -41,10 +43,13 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "giftgen.fullname" . }}-config
-          {{- with .Values.worker.extraEnv }}
           env:
+            - name: SERVICE_NAME
+              value: giftgen-worker
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          {{- with .Values.worker.extraEnv }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
           resources:
             {{- toYaml .Values.worker.resources | nindent 12 }}
-

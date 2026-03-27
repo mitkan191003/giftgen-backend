@@ -1,0 +1,13 @@
+alembic<2.0.0,>=1.14.1
+boto3<2.0.0,>=1.37.0
+fastapi<1.0.0,>=0.115.12
+httpx<1.0.0,>=0.28.1
+PyJWT[crypto]<3.0.0,>=2.10.1
+psycopg[binary]<4.0.0,>=3.2.9
+pydantic-settings<3.0.0,>=2.8.1
+sqlalchemy<3.0.0,>=2.0.39
+uvicorn[standard]<1.0.0,>=0.34.0
+
+[dev]
+pytest<9.0.0,>=8.3.5
+ruff<1.0.0,>=0.11.0

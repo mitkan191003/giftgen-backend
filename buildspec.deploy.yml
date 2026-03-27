@@ -1,0 +1,72 @@
+version: 0.2
+
+env:
+  shell: bash
+
+phases:
+  install:
+    runtime-versions:
+      python: "3.12"
+  pre_build:
+    commands:
+      - set -euo pipefail
+      - test -n "${ARGOCD_SERVER:-}"
+      - test -n "${ARGOCD_APPLICATION:-}"
+      - test -n "${ARGOCD_DEPLOY_SECRET:-}"
+      - export IMAGE_TAG="${IMAGE_TAG:-${CODEBUILD_RESOLVED_SOURCE_VERSION:-}}"
+      - export SOURCE_COMMIT_ID="${SOURCE_COMMIT_ID:-${IMAGE_TAG:-}}"
+      - test -n "${IMAGE_TAG:-}"
+      - test -n "${SOURCE_COMMIT_ID:-}"
+      - export ARGOCD_SERVER_HOST="${ARGOCD_SERVER#https://}"
+      - export ARGOCD_SERVER_HOST="${ARGOCD_SERVER_HOST#http://}"
+      - |
+        export ARGOCD_ACCESS_TOKEN="$(
+          python3 - <<'PY'
+        import json
+        import os
+        import urllib.request
+
+        secret = json.loads(os.environ["ARGOCD_DEPLOY_SECRET"])
+        token = secret.get("authToken") or secret.get("token")
+        if token:
+            print(token)
+            raise SystemExit(0)
+
+        username = secret.get("username")
+        password = secret.get("password")
+        if not username or not password:
+            raise SystemExit(
+                "ARGOCD_DEPLOY_SECRET must contain either authToken or username/password"
+            )
+
+        server = os.environ["ARGOCD_SERVER"].rstrip("/")
+        payload = json.dumps({"username": username, "password": password}).encode()
+        request = urllib.request.Request(
+            f"{server}/api/v1/session",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(request, timeout=30) as response:
+            session = json.loads(response.read().decode())
+
+        token = session.get("token")
+        if not token:
+            raise SystemExit("Argo CD session response did not include a token")
+
+        print(token)
+        PY
+        )"
+      - curl -fsSL -o /usr/local/bin/argocd "${ARGOCD_SERVER}/download/argocd-linux-arm64"
+      - chmod +x /usr/local/bin/argocd
+      - argocd version --client
+  build:
+    commands:
+      - argocd app set "$ARGOCD_APPLICATION" --server "$ARGOCD_SERVER_HOST" --auth-token "$ARGOCD_ACCESS_TOKEN" --grpc-web --revision "$SOURCE_COMMIT_ID" -p "api.image.tag=$IMAGE_TAG" -p "worker.image.tag=$IMAGE_TAG"
+      - argocd app get "$ARGOCD_APPLICATION" --server "$ARGOCD_SERVER_HOST" --auth-token "$ARGOCD_ACCESS_TOKEN" --grpc-web --hard-refresh >/dev/null
+      - argocd app sync "$ARGOCD_APPLICATION" --server "$ARGOCD_SERVER_HOST" --auth-token "$ARGOCD_ACCESS_TOKEN" --grpc-web --async
+  post_build:
+    commands:
+      - argocd app wait "$ARGOCD_APPLICATION" --server "$ARGOCD_SERVER_HOST" --auth-token "$ARGOCD_ACCESS_TOKEN" --grpc-web --sync --health --operation --timeout 900
+
+artifacts:
+  files: []

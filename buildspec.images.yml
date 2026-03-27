@@ -1,0 +1,32 @@
+version: 0.2
+
+env:
+  shell: bash
+
+phases:
+  pre_build:
+    commands:
+      - set -euo pipefail
+      - test -n "${AWS_DEFAULT_REGION:-}"
+      - test -n "${API_REPO_URI:-}"
+      - test -n "${WORKER_REPO_URI:-}"
+      - export IMAGE_TAG="${IMAGE_TAG:-${CODEBUILD_RESOLVED_SOURCE_VERSION:-}}"
+      - test -n "${IMAGE_TAG:-}"
+      - export API_IMAGE_TAG="$IMAGE_TAG"
+      - export WORKER_IMAGE_TAG="$IMAGE_TAG"
+      - export REGISTRY="${API_REPO_URI%%/*}"
+      - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$REGISTRY"
+      - echo "Building API image tag ${API_IMAGE_TAG}"
+      - echo "Building worker image tag ${WORKER_IMAGE_TAG}"
+  build:
+    commands:
+      - docker build -f Dockerfile.api -t "${API_REPO_URI}:${API_IMAGE_TAG}" .
+      - docker build -f Dockerfile.worker -t "${WORKER_REPO_URI}:${WORKER_IMAGE_TAG}" .
+  post_build:
+    commands:
+      - docker push "${API_REPO_URI}:${API_IMAGE_TAG}"
+      - docker push "${WORKER_REPO_URI}:${WORKER_IMAGE_TAG}"
+      - printf 'api_image=%s\nworker_image=%s\n' "${API_REPO_URI}:${API_IMAGE_TAG}" "${WORKER_REPO_URI}:${WORKER_IMAGE_TAG}"
+
+artifacts:
+  files: []

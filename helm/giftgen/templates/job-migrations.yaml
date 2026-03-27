@@ -7,8 +7,8 @@ metadata:
     {{- include "giftgen.labels" . | nindent 4 }}
     app.kubernetes.io/component: migrations
   annotations:
-    argocd.argoproj.io/hook: PreSync
-    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-options: Force=true,Replace=true
 spec:
   backoffLimit: {{ .Values.migrations.backoffLimit }}
   template:
@@ -35,9 +35,12 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "giftgen.fullname" . }}-config
-          {{- with .Values.migrations.extraEnv }}
           env:
+            - name: SERVICE_NAME
+              value: giftgen-migrations
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          {{- with .Values.migrations.extraEnv }}
             {{- toYaml . | nindent 12 }}
           {{- end }}
 {{- end }}
-
