@@ -1,4 +1,5 @@
 api:
+api:
   image:
     # Promote a tested source commit SHA into prod with the shared delivery deploy project.
     tag: managed-by-promotion
