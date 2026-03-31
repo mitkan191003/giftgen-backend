@@ -6,81 +6,72 @@ This repository contains the API, the background worker, the cleanup job, and th
 
 ## Related Repositories
 
-- [giftgen-frontend](https://github.com/mitkan191003/giftgen-frontend): the Next.js application used by end users
-- [giftgen-infra](https://github.com/mitkan191003/giftgen-infra): Terraform and delivery infrastructure for AWS, ArgoCD, and environment setup
+- [giftgen-frontend](https://github.com/mitkan191003/giftgen-frontend) for the web application
+- [giftgen-infra](https://github.com/mitkan191003/giftgen-infra) for AWS, Kubernetes, delivery, DNS, and environment setup
 
-## Where This Repo Fits
+## Role In The Architecture
 
-At a high level, the system looks like this:
+The backend is responsible for turning a user request into a durable generation workflow.
 
-1. A user signs in and starts a generation flow in the frontend.
-2. The frontend sends requests to this backend.
-3. The backend refines prompts, creates generation jobs, and hands work off to the worker.
-4. The worker calls the external model service, stores the resulting files, and marks the job complete.
-5. The backend exposes those results back to the frontend for previewing, sharing, and download.
+A typical request moves through the system like this:
+
+1. The frontend sends a creation request to the API.
+2. The API validates the request, writes metadata to Postgres, and creates a queued generation job.
+3. The worker picks up that job and calls the generation provider.
+4. Generated files are stored in S3 or local storage, depending on environment.
+5. The API exposes the finished creation, asset, and share data back to the frontend.
 
 The codebase is organized as a modular backend that is deployed as two runtime workloads:
 
-- `giftgen-api` for HTTP traffic
-- `giftgen-worker` for background processing
+- an API service for user-facing HTTP traffic
+- a worker for asynchronous generation jobs
+- a scheduled cleanup job for data retention
 
-That split keeps the domain model in one repository without forcing long-running generation work and user-facing API traffic into the same process.
+That keeps the business rules in one place while allowing the API and background processing to scale separately.
 
 ## What’s In This Repository
 
-- FastAPI application code
-- SQLAlchemy models and Alembic migrations
-- generation worker and scheduled cleanup worker
-- storage and provider adapters
-- container build files
-- Helm chart for Kubernetes deployment
-- basic architecture notes and test coverage
+- `app/` for the FastAPI application, worker logic, models, services, and observability code
+- `alembic/` for database migrations
+- `helm/` for the Kubernetes chart used in deployed environments
+- `Dockerfile.api` and `Dockerfile.worker` for container builds
+- `buildspec.*.yml` for the AWS delivery pipeline
+- `tests/` for backend test coverage
 
-## Getting Started
+## Running It Locally
 
-The backend is designed so it can run locally without a full cloud environment. Local development uses SQLite and local asset storage by default.
+The backend is set up to be usable without standing up the full cloud environment first. Local development defaults to SQLite, local file storage, and development auth.
 
 ### Requirements
 
 - Python 3.12
-- a virtual environment tool of your choice
+- a virtual environment tool
 
-### Local Setup
-
-1. Create and activate a virtual environment.
-2. Install the package and development dependencies.
-3. Copy `.env.example` to `.env` and adjust values if needed.
-4. Run the API.
-5. Run the worker separately if you want to process generation jobs locally.
-
-Example:
+### Basic Setup
 
 ```bash
 python -m venv venv
 source venv/bin/activate
 pip install -e '.[dev]'
 cp .env.example .env
+```
+
+Start the API:
+
+```bash
 uvicorn app.main:app --reload
 ```
 
-To run the worker in another shell:
+If you want to process queued jobs locally, run the worker in a second shell:
 
 ```bash
 source venv/bin/activate
 python -m app.workers.generation --watch
 ```
 
-By default, local development uses:
-
-- SQLite for relational data
-- local filesystem storage for generated assets
-- development auth instead of Cognito
-
-That keeps the repository approachable when you want to work on API behavior, job flow, or data models without standing up the full AWS stack first.
-
 ## Configuration
 
-The main runtime settings live in `.env`. A few of the most important ones are:
+Most local configuration lives in `.env`. The main pieces are:
 
 - `DATABASE_URL`
 - `AUTH_MODE`
@@ -97,7 +88,9 @@ For deployed environments, the backend can also resolve database and provider cr
 
 ## Deployment
 
-Production deployment is handled outside this repository:
+This repository contains the application artifacts needed for deployment, but it does not provision the platform by itself.
+
+In deployed environments:
 
 - images are built and pushed by the delivery pipeline from the infrastructure repo
 - ArgoCD deploys the Helm chart

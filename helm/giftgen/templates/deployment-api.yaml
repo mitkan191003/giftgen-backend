@@ -9,6 +9,7 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   replicas: {{ .Values.api.replicaCount }}
+  revisionHistoryLimit: {{ .Values.api.revisionHistoryLimit }}
   selector:
     matchLabels:
       {{- include "giftgen.selectorLabels" . | nindent 6 }}

@@ -25,4 +25,6 @@ The chart currently manages:
 - Alembic migration `Job` ordered before the API and worker with Argo sync waves
 - API `Ingress`
 
+The API and worker deployments cap Kubernetes rollout history through `revisionHistoryLimit` so old ReplicaSets are pruned during normal rollout activity.
+
 The chart expects the cluster bootstrap layer to install AWS Load Balancer Controller and ExternalDNS.
