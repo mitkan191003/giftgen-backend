@@ -63,7 +63,28 @@ phases:
     commands:
       - argocd app set "$ARGOCD_APPLICATION" --server "$ARGOCD_SERVER_HOST" --auth-token "$ARGOCD_ACCESS_TOKEN" --grpc-web --revision "$SOURCE_COMMIT_ID" -p "api.image.tag=$IMAGE_TAG" -p "worker.image.tag=$IMAGE_TAG"
       - argocd app get "$ARGOCD_APPLICATION" --server "$ARGOCD_SERVER_HOST" --auth-token "$ARGOCD_ACCESS_TOKEN" --grpc-web --hard-refresh >/dev/null
-      - argocd app sync "$ARGOCD_APPLICATION" --server "$ARGOCD_SERVER_HOST" --auth-token "$ARGOCD_ACCESS_TOKEN" --grpc-web --async
+      - |
+        set +e
+        SYNC_OUTPUT="$(
+          argocd app sync "$ARGOCD_APPLICATION" \
+            --server "$ARGOCD_SERVER_HOST" \
+            --auth-token "$ARGOCD_ACCESS_TOKEN" \
+            --grpc-web \
+            --async \
+            2>&1
+        )"
+        SYNC_STATUS=$?
+        set -e
+
+        if [ "$SYNC_STATUS" -eq 0 ]; then
+          printf '%s\n' "$SYNC_OUTPUT"
+        elif printf '%s' "$SYNC_OUTPUT" | grep -Fq "another operation is already in progress"; then
+          printf '%s\n' "$SYNC_OUTPUT"
+          echo "Argo CD is already reconciling this application; continuing to wait for completion."
+        else
+          printf '%s\n' "$SYNC_OUTPUT"
+          exit "$SYNC_STATUS"
+        fi
   post_build:
     commands:
       - argocd app wait "$ARGOCD_APPLICATION" --server "$ARGOCD_SERVER_HOST" --auth-token "$ARGOCD_ACCESS_TOKEN" --grpc-web --sync --health --operation --timeout 900
