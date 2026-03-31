@@ -36,23 +36,23 @@ def clear_settings_env(monkeypatch) -> None:
 
 def test_settings_split_comma_delimited_cors_origins(monkeypatch) -> None:
     clear_settings_env(monkeypatch)
-    monkeypatch.setenv("CORS_ORIGINS", "https://dev.giftgen.mithrak.com, https://giftgen.mithrak.com")
+    monkeypatch.setenv("CORS_ORIGINS", "https://dev.giftgen-dev.mithrak.com, https://giftgen.mithrak.com")
 
     settings = Settings()
 
     assert settings.cors_origins == [
-        "https://dev.giftgen.mithrak.com",
+        "https://dev.giftgen-dev.mithrak.com",
         "https://giftgen.mithrak.com",
     ]
 
 
 def test_settings_parse_json_cors_origins(monkeypatch) -> None:
     clear_settings_env(monkeypatch)
-    monkeypatch.setenv("CORS_ORIGINS", '["https://dev.giftgen.mithrak.com"]')
+    monkeypatch.setenv("CORS_ORIGINS", '["https://dev.giftgen-dev.mithrak.com"]')
 
     settings = Settings()
 
-    assert settings.cors_origins == ["https://dev.giftgen.mithrak.com"]
+    assert settings.cors_origins == ["https://dev.giftgen-dev.mithrak.com"]
 
 
 def test_settings_build_database_url_from_secret_and_endpoint_fallback(monkeypatch) -> None:
