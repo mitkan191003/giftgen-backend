@@ -1,28 +1,53 @@
 # Backend Architecture
 
-## Service Boundaries
+## Overview
 
-This repo keeps a modular monolith at the code level but deploys two workloads:
+The backend is the application core of GiftGen. It owns authenticated API traffic, generation job state, asset metadata, sharing, and background processing.
 
-- API deployment
-  - Handles authenticated HTTP traffic
-  - Owns thread, creation, share, and job status APIs
-  - Produces queued generation jobs
-- Worker deployment
-  - Polls queued jobs
-  - Calls Modal
-  - Stores artifacts
-  - Updates job and creation state
+This repository is deployed as multiple workloads from one codebase:
 
-This keeps the data model and business rules in one place while still separating latency-sensitive API traffic from long-running generation work.
+- an API service for HTTP traffic
+- a generation worker for asynchronous model creation
+- a cleanup worker for scheduled data retention tasks
 
-## Auth Strategy
+The code is kept together because the API, worker, and cleanup logic all depend on the same data model and the same provider integrations.
 
-Production auth should be Cognito-backed JWT validation. Each deployed environment should use its own Cognito configuration and stable frontend origin. This scaffold currently exposes a development-only identity dependency that auto-provisions a user from `X-Dev-User-Email`. That keeps local iteration unblocked without contaminating the production design.
+## Runtime Responsibilities
 
-## Persistence
+### API
 
-Canonical relational entities:
+The API is responsible for:
+
+- user identity resolution
+- thread and message APIs
+- creation submission
+- job status reads
+- share creation and revocation
+- private and public asset delivery
+- health and readiness endpoints
+
+### Generation Worker
+
+The generation worker is responsible for:
+
+- selecting queued generation jobs from Postgres
+- moving jobs through their lifecycle
+- calling the generation provider
+- storing generated files
+- creating asset records
+- marking creations as ready or failed
+
+### Cleanup Worker
+
+The cleanup worker is responsible for:
+
+- expiring stale queued or running jobs
+- removing expired asset files
+- deleting old failed or deleted creations according to retention rules
+
+## Data Model
+
+The main relational entities are:
 
 - `users`
 - `chat_threads`
@@ -32,48 +57,65 @@ Canonical relational entities:
 - `assets`
 - `shares`
 
-The job table is the durable state machine. Even if SQS is introduced later for dispatch, job truth still lives in Postgres.
+`generation_jobs` is the durable record of asynchronous work. The worker reads queued jobs from the database and updates them in place as work progresses.
 
-## Async Model
+## Authentication
 
-The intended production flow is:
+The backend supports two auth modes:
 
-1. API creates `creations` and `generation_jobs` rows in one transaction.
-2. API publishes the job ID to a queue.
-3. Worker claims the job, marks it `running`, calls Modal, stores artifacts, and marks completion.
-4. Frontend polls job status or upgrades to SSE later.
+- `development`
+- `cognito`
 
-This scaffold ships the durable parts first: schemas, statuses, and a worker that can process queued jobs directly. The queue transport can be added without reshaping the domain model.
+In development mode, a caller can identify itself with `X-Dev-User-Email`. In deployed environments, the API validates Cognito bearer tokens and maps requests to application users by Cognito subject.
 
-## Guardrails
+## Generation Flow
 
-Prompt inspection happens before:
+The generation flow is:
 
-- chat message persistence when the message is obviously malicious
-- creation submission
+1. the API accepts a creation request
+2. the API writes a `creation` and a queued `generation_job`
+3. the worker claims the next queued job
+4. the worker calls the generation provider
+5. generated files are stored and linked to the creation
+6. the creation moves to `ready` or `failed`
+7. the frontend polls job status and then loads the finished gift
 
-The current implementation is heuristic and intentionally conservative. It exists to create the right control point, not to be the final moderation system.
+## Providers And Services
 
-## Provider Adapters
+The backend isolates external integrations behind service classes:
 
-The service layer is split behind adapters:
+- `PromptRefiner` shapes user prompts into generation-ready text
+- `ModalGenerationClient` calls the model endpoint
+- `AssetStore` writes and deletes stored assets
 
-- `PromptRefiner`: placeholder for OpenAI-backed prompt refinement
-- `ModalGenerationClient`: HTTP adapter for the existing Modal service
-- `AssetStore`: local filesystem or S3-backed artifact persistence
+That separation keeps provider-specific behavior out of the API and worker flow.
 
-These boundaries let the worker stay stable when provider details change.
+## Storage
+
+The backend supports two storage modes:
+
+- local filesystem storage for local development
+- S3-backed storage for deployed environments
+
+Asset metadata always lives in Postgres. The binary files live either on disk or in S3 depending on configuration.
 
 ## Deployment Shape
 
-The first GitOps deployment slice packages the backend as:
+The backend is packaged as:
 
-- an API image
-- a worker image
-- one Helm chart that defines API, worker, migrations, cleanup, and ingress
+- an API container image
+- a worker container image
+- one Helm chart that defines the API, worker, migrations job, cleanup job, service account, config, and ingress
 
-Runtime configuration comes from Terraform outputs and AWS Secrets Manager instead of handwritten Kubernetes secrets:
+Runtime configuration is passed in through environment variables, Terraform-managed values, and AWS Secrets Manager.
 
-- Terraform bootstrap creates an IRSA role for the runtime service account
-- the chart passes secret ARNs as environment variables
-- the application resolves database, Modal, and OpenAI settings from Secrets Manager at startup
+## Observability
+
+The backend emits:
+
+- structured application logs
+- request correlation IDs
+- CloudWatch Embedded Metric Format metrics
+- optional Sentry events
+
+That applies across API traffic, background generation work, and cleanup jobs.

@@ -1,10 +1,9 @@
 api:
-api:
   image:
-    # Promote a tested source commit SHA into prod with the shared delivery deploy project.
+    # Production uses one release tag across API and worker.
     tag: managed-by-promotion
 
 worker:
   image:
-    # Keep worker and API on the same promoted commit SHA.
+    # Production uses one release tag across API and worker.
     tag: managed-by-promotion

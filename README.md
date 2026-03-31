@@ -1,151 +1,127 @@
 # GiftGen Backend
 
-FastAPI application for chat orchestration, creation metadata, sharing, and generation job management.
+GiftGen Backend is the application layer behind GiftGen, a 3D gift generation experience built around text prompts, asynchronous generation jobs, and shareable results.
 
-## Architecture
+This repository contains the API, the background worker, the cleanup job, and the Helm chart used to deploy the backend into Kubernetes. In production, it sits between the frontend and the rest of the platform. It accepts user requests, manages job state, talks to external generation services, stores metadata in Postgres, stores generated assets in S3, and exposes the data the frontend needs to render finished gifts.
 
-The backend is intentionally split into two runtime paths that share one codebase:
+## Related Repositories
 
-- `giftgen-api`: user-facing HTTP API for threads, creations, shares, and health endpoints
-- `giftgen-worker`: background worker that processes queued generation jobs and persists assets
+- [giftgen-frontend](https://github.com/mitkan191003/giftgen-frontend): the Next.js application used by end users
+- [giftgen-infra](https://github.com/mitkan191003/giftgen-infra): Terraform and delivery infrastructure for AWS, ArgoCD, and environment setup
 
-The production target is EKS. For local development this scaffold defaults to SQLite and local asset storage so the app can run before RDS, S3, and Cognito are wired.
+## Where This Repo Fits
 
-## Local Development
+At a high level, the system looks like this:
 
-1. Create a virtual environment and install dependencies.
-2. Set `AUTH_MODE=development`.
-3. Run the API with `uvicorn app.main:app --reload`.
-4. Optionally run the worker with `python -m app.workers.generation --watch`.
+1. A user signs in and starts a generation flow in the frontend.
+2. The frontend sends requests to this backend.
+3. The backend refines prompts, creates generation jobs, and hands work off to the worker.
+4. The worker calls the external model service, stores the resulting files, and marks the job complete.
+5. The backend exposes those results back to the frontend for previewing, sharing, and download.
 
-Example environment:
+The codebase is organized as a modular backend that is deployed as two runtime workloads:
 
-```env
-DATABASE_URL=sqlite+pysqlite:///./giftgen.db
-AUTH_MODE=development
-MODAL_API_URL=
-ASSET_STORAGE_MODE=local
-PUBLIC_SHARE_BASE_URL=http://localhost:3000/share
+- `giftgen-api` for HTTP traffic
+- `giftgen-worker` for background processing
+
+That split keeps the domain model in one repository without forcing long-running generation work and user-facing API traffic into the same process.
+
+## What’s In This Repository
+
+- FastAPI application code
+- SQLAlchemy models and Alembic migrations
+- generation worker and scheduled cleanup worker
+- storage and provider adapters
+- container build files
+- Helm chart for Kubernetes deployment
+- basic architecture notes and test coverage
+
+## Getting Started
+
+The backend is designed so it can run locally without a full cloud environment. Local development uses SQLite and local asset storage by default.
+
+### Requirements
+
+- Python 3.12
+- a virtual environment tool of your choice
+
+### Local Setup
+
+1. Create and activate a virtual environment.
+2. Install the package and development dependencies.
+3. Copy `.env.example` to `.env` and adjust values if needed.
+4. Run the API.
+5. Run the worker separately if you want to process generation jobs locally.
+
+Example:
+
+```bash
+python -m venv venv
+source venv/bin/activate
+pip install -e '.[dev]'
+cp .env.example .env
+uvicorn app.main:app --reload
 ```
 
-Authenticated routes accept `X-Dev-User-Email` while `AUTH_MODE=development`.
+To run the worker in another shell:
 
-Observability-related envs:
-
-```env
-SERVICE_NAME=giftgen-api
-LOG_LEVEL=INFO
-METRIC_NAMESPACE=GiftGen/Application
-REQUEST_ID_HEADER_NAME=X-Request-Id
-SENTRY_DSN=
-SENTRY_TRACES_SAMPLE_RATE=0.1
-SENTRY_ENABLE_LOGS=false
+```bash
+source venv/bin/activate
+python -m app.workers.generation --watch
 ```
 
-## Production Notes
+By default, local development uses:
 
-- For Cognito-backed environments set:
+- SQLite for relational data
+- local filesystem storage for generated assets
+- development auth instead of Cognito
 
-```env
-AUTH_MODE=cognito
-COGNITO_REGION=us-east-1
-COGNITO_USER_POOL_ID=us-east-1_...
-COGNITO_CLIENT_ID=...
-COGNITO_DOMAIN=https://your-prefix.auth.us-east-1.amazoncognito.com
-```
+That keeps the repository approachable when you want to work on API behavior, job flow, or data models without standing up the full AWS stack first.
 
-- The backend verifies Cognito JWTs and maps users by the stable Cognito subject claim.
-- The frontend should send the Cognito ID token as the bearer token for API requests.
-- Set `DATABASE_URL` to the RDS connection string.
-- Set `ASSET_STORAGE_MODE=s3` and `ASSET_BUCKET_NAME`.
-- Configure `MODAL_API_URL` and Modal proxy auth headers if the endpoint requires them.
-- Point `PUBLIC_SHARE_BASE_URL` at the frontend share domain.
+## Configuration
 
-For the deployed EKS path, the preferred runtime inputs are:
+The main runtime settings live in `.env`. A few of the most important ones are:
+
+- `DATABASE_URL`
+- `AUTH_MODE`
+- `MODAL_API_URL`
+- `ASSET_STORAGE_MODE`
+- `PUBLIC_SHARE_BASE_URL`
+
+For deployed environments, the backend can also resolve database and provider credentials from AWS Secrets Manager using:
 
 - `DATABASE_SECRET_ID`
 - `DATABASE_ENDPOINT`
 - `MODAL_SECRET_ID`
 - `OPENAI_SECRET_ID`
 
-The application resolves those values from AWS Secrets Manager at startup, so the first deployment path does not need handwritten Kubernetes secrets for database or provider credentials.
+## Deployment
 
-Database note:
+Production deployment is handled outside this repository:
 
-- RDS-managed Secrets Manager payloads are not treated as the sole source of connection metadata anymore.
-- The runtime can now combine `DATABASE_SECRET_ID` with `DATABASE_ENDPOINT`, which makes startup resilient if the secret only contains credentials and not the hostname.
+- images are built and pushed by the delivery pipeline from the infrastructure repo
+- ArgoCD deploys the Helm chart
+- Kubernetes runtime configuration is assembled from Terraform-managed infrastructure outputs and AWS secrets
 
-## Observability
-
-The backend now emits:
-
-- structured JSON logs for API, worker, and cleanup
-- request IDs on every API response
-- CloudWatch Embedded Metric Format metrics for request, auth, generation, Modal, prompt refinement, and cleanup activity
-- optional Sentry events if `SENTRY_DSN` is set
-
-The request correlation path is:
-
-1. frontend generates `X-Request-Id`
-2. API returns the same request ID in the response header
-3. backend logs include `request_id`
-4. worker logs include `job_id` and `creation_id`
-
-Use the log and metric names documented in [Observability.md](/home/mithrak/giftgen/Observability.md).
-
-## Containers And Helm
-
-This repo now includes:
+This repository includes the deployment artifacts needed for that flow:
 
 - `Dockerfile.api`
 - `Dockerfile.worker`
+- `helm/giftgen`
 - `buildspec.images.yml`
 - `buildspec.deploy.yml`
-- `helm/giftgen`
-- `scripts/check_runtime_config.py`
 
-The Helm chart deploys:
-
-- API deployment and service
-- worker deployment
-- cleanup `CronJob`
-- Alembic migration `Job` ordered before the API and worker with Argo sync waves
-- optional API `Ingress`
-
-If you enable the AWS delivery path in Terraform, CodeBuild uses `buildspec.images.yml` to build and push both backend images using the source commit SHA as the image tag. If you also enable the optional refresh stage, `buildspec.deploy.yml` updates the ArgoCD `Application` to use that same commit SHA for both `targetRevision` and the Helm image-tag overrides before syncing. When ArgoCD auto-sync is already reconciling the application, the deploy build now waits for that in-progress operation instead of failing the pipeline on a harmless race.
-
-For a cheap local guardrail before pushing, run:
-
-```bash
-cd backend
-python3 scripts/check_runtime_config.py
-```
-
-That validates the resolved runtime settings and ensures SQLAlchemy can parse and construct an engine from the computed database URL without making a live database connection.
-
-To validate the deployed AWS path instead of the local sqlite default, run it with the same DB env shape the pod uses, for example:
-
-```bash
-cd backend
-DATABASE_URL= \
-DATABASE_SECRET_ID=<rds-secret-arn-or-name> \
-DATABASE_ENDPOINT=<rds-endpoint> \
-python3 scripts/check_runtime_config.py
-```
-
-## Initial Surface
+## Useful Entry Points
 
 - `GET /healthz`
 - `GET /readyz`
-- `POST /api/v1/threads`
-- `GET /api/v1/threads`
-- `GET /api/v1/threads/{thread_id}`
-- `POST /api/v1/threads/{thread_id}/messages`
 - `POST /api/v1/creations`
 - `GET /api/v1/creations`
 - `GET /api/v1/jobs/{job_id}`
-- `POST /api/v1/shares`
-- `POST /api/v1/shares/{share_id}/revoke`
-- `GET /api/v1/public/shares/{slug}`
 - `GET /api/v1/assets/{asset_id}/content`
-- `GET /api/v1/public/assets/{asset_id}`
+- `GET /api/v1/public/shares/{slug}`
+
+## Further Reading
+
+- [docs/architecture.md](docs/architecture.md)
+- [helm/README.md](helm/README.md)
