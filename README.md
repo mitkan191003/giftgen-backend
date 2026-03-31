@@ -112,7 +112,7 @@ The Helm chart deploys:
 - Alembic migration `Job` ordered before the API and worker with Argo sync waves
 - optional API `Ingress`
 
-If you enable the AWS delivery path in Terraform, CodeBuild uses `buildspec.images.yml` to build and push both backend images using the source commit SHA as the image tag. If you also enable the optional refresh stage, `buildspec.deploy.yml` updates the ArgoCD `Application` to use that same commit SHA for both `targetRevision` and the Helm image-tag overrides before syncing.
+If you enable the AWS delivery path in Terraform, CodeBuild uses `buildspec.images.yml` to build and push both backend images using the source commit SHA as the image tag. If you also enable the optional refresh stage, `buildspec.deploy.yml` updates the ArgoCD `Application` to use that same commit SHA for both `targetRevision` and the Helm image-tag overrides before syncing. When ArgoCD auto-sync is already reconciling the application, the deploy build now waits for that in-progress operation instead of failing the pipeline on a harmless race.
 
 For a cheap local guardrail before pushing, run:
 
